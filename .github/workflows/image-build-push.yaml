@@ -133,7 +133,7 @@ jobs:
       - name: Load and push Docker image
         run: |
           docker load --input /tmp/image.tar
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.short_sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.environment }}-${{ needs.prepare.outputs.short_sha }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.environment }}-latest
 
   verify:
