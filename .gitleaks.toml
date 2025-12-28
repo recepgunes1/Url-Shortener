@@ -1,0 +1,29 @@
+title = "gitleaks config"
+
+[[rules]]
+id = "postgres-connection-string"
+description = "PostgreSQL Connection String with Password"
+entropy = 3.5
+regex = '''(?i)Host\s*=\s*[^;]*Password\s*=\s*[^;"']+'''
+keywords = ["password", "host", "postgres"]
+
+[[rules]]
+id = "redis-connection-string"
+description = "Redis Connection String with Password"
+entropy = 3.5
+regex = '''(?i)localhost:\d+.*password\s*=\s*[^,"']+'''
+keywords = ["password", "redis"]
+
+[[rules]]
+id = "generic-connection-string-password"
+description = "Generic Connection String with Password"
+entropy = 3.0
+regex = '''(?i)["'](.*?password\s*=\s*[^"';]+)["']'''
+keywords = ["password"]
+
+[[rules]]
+id = "database-username-password"
+description = "Database Username and Password Pattern"
+entropy = 3.5
+regex = '''(?i)Username\s*=\s*[^;]+.*Password\s*=\s*[^;"']+'''
+keywords = ["username", "password"]
