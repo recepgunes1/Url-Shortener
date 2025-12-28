@@ -39,6 +39,10 @@ public static class Registration
             )
         );
         services.AddSingleton<ICacheService, CacheService>();
+        services
+            .AddHealthChecks()
+            .AddRedis(configuration.GetOrThrowException<string>("ConnectionStrings:Redis"))
+            .AddDbContextCheck<AppDbContext>();
     }
 
     public static void ApplyMigrations(this WebApplication? application)

@@ -1,3 +1,5 @@
+using HealthChecks.UI.Client;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
 using Serilog;
 using UrlShortener.API.Infrastructure;
@@ -36,5 +38,14 @@ public static class Registration
         }
 
         app.UseSerilogRequestLogging();
+
+        app.MapHealthChecks(
+            "/health",
+            new HealthCheckOptions
+            {
+                Predicate = _ => true,
+                ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse,
+            }
+        );
     }
 }
