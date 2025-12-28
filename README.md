@@ -16,7 +16,7 @@ pre-commit install
 
 #### 2. Running Services 
 
-Copy the example env file:
+Copy and edit the example env file:
 
 ```bash
 cp ./utils/.env.example .env
