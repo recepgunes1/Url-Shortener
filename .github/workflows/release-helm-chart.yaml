@@ -1,9 +1,20 @@
 name: Release Helm Chart
 
 on:
-  push:
-    tags:
-      - '*.*.*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Chart version (e.g., 1.0.0)'
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -28,28 +39,44 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      - name: Extract version from tag
+      - name: Set version
         id: version
         run: |
-          # Get tag name (e.g., v1.0.0)
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          # Remove 'v' prefix to get version (e.g., 1.0.0)
-          VERSION=${TAG_NAME#v}
-          
-          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          VERSION="${{ inputs.version }}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Chart version will be: ${VERSION}"
 
-      - name: Get latest image
+      - name: Get latest image for environment
         id: image
         run: |
-          IMAGE_TAG="latest"
+          ENV="${{ inputs.environment }}"
+          PACKAGE_NAME="url-shortener/backend"
+          
+          echo "Fetching available images for environment: ${ENV}"
+          
+          # Get all package versions from GitHub Container Registry
+          VERSIONS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/user/packages/container/${PACKAGE_NAME}/versions")
+          
+          # Extract tags that match the environment pattern and get the most recent one
+          IMAGE_TAG=$(echo "$VERSIONS" | jq -r \
+            --arg env "${ENV}" \
+            '[.[] | select(.metadata.container.tags[] | startswith($env + "-")) | 
+            {tag: .metadata.container.tags[], created: .created_at}] | 
+            sort_by(.created) | reverse | .[0].tag' 2>/dev/null)
+          
+          if [ -z "$IMAGE_TAG" ] || [ "$IMAGE_TAG" = "null" ]; then
+            echo "Error: No image found for environment '${ENV}'"
+            echo "Please build and push an image for this environment first"
+            exit 1
+          fi
+          
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "Using image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          echo "Found image tag: ${IMAGE_TAG}"
 
       - name: Verify image exists
         run: |
-          # Optional: verify the image exists in the registry
           echo "Verifying image exists..."
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image.outputs.image_tag }} || {
             echo "Error: Image not found in registry"
@@ -82,7 +109,7 @@ jobs:
       - name: Commit changes
         run: |
           git add charts/url-shortener/Chart.yaml charts/url-shortener/values.yaml
-          git commit -m "Release chart version ${{ steps.version.outputs.version }}" || {
+          git commit -m "Release chart version ${{ steps.version.outputs.version }} for ${{ inputs.environment }}" || {
             echo "No changes to commit"
           }
 
@@ -98,8 +125,8 @@ jobs:
         run: |
           echo "### Helm Chart Released Successfully! :package:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "**Chart Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Tag:** ${{ steps.version.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Image Tag:** ${{ steps.image.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Full Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
