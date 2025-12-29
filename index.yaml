@@ -1,0 +1,16 @@
+apiVersion: v1
+entries:
+  url-shortener:
+  - apiVersion: v2
+    appVersion: 1.0.0
+    created: "2025-12-29T18:14:51.111824449Z"
+    description: A Helm chart for URL Shortener application
+    digest: 51fa01f50bb01ca16044c424efba2ff48ba8daa266f782372ea2bad6f762ecf1
+    maintainers:
+    - name: recepgunes1
+    name: url-shortener
+    type: application
+    urls:
+    - https://github.com/recepgunes1/Url-Shortener/releases/download/url-shortener-0.2.0/url-shortener-0.2.0.tgz
+    version: 0.2.0
+generated: "2025-12-29T18:14:51.111834858Z"
