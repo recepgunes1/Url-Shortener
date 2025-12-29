@@ -1,30 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "url-shortener.fullname" . }}
+  name: {{ .Chart.Name }}
   labels:
-    {{- include "url-shortener.labels" . | nindent 4 }}
+    app: {{ .Chart.Name }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "url-shortener.selectorLabels" . | nindent 6 }}
+      app: {{ .Chart.Name }}
   template:
     metadata:
       labels:
-        {{- include "url-shortener.selectorLabels" . | nindent 8 }}
+        app: {{ .Chart.Name }}
     spec:
       containers:
       - name: {{ .Chart.Name }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
-        {{- if .Values.env }}
-        env:
-          {{- toYaml .Values.env | nindent 10 }}
-        {{- end }}
-        resources:
-          {{- toYaml .Values.resources | nindent 10 }}
+        - containerPort: 8080
+        envFrom:
+        - secretRef:
+            name: {{ .Values.secretName }}
