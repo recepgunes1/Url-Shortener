@@ -8,13 +8,8 @@ A URL shortening service built with .NET.
 
 ### Setup
 
-#### 1. Install Pre-commit Hooks
-Needed for commiting changes.
-```bash
-pre-commit install
-```
 
-#### 2. Running Services 
+#### 1. Running Services 
 
 Copy and edit the example env file:
 
@@ -28,7 +23,7 @@ Start services:
 docker compose --env-file .env -f utils/docker-compose.development.yaml up -d
 ```
 
-##### (Optional) 2.1 Build an image and run container 
+##### (Optional) 1.1 Build an image and run container 
 ```
 docker build -t url-shortener:latest -f src/UrlShortener.API/Dockerfile .
 docker run -p 8080:8080 -p 8001:8001 \
@@ -39,7 +34,7 @@ docker run -p 8080:8080 -p 8001:8001 \
   -d url-shortener:latest
 ```
 
-#### 3. Monitor Locally
+#### 2. Monitor Locally
 
 Needed for local monitoring:
 
