@@ -126,6 +126,10 @@ jobs:
             echo "No changes to commit"
           }
 
+      - name: Push changes
+        run: |
+          git push origin main
+
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.6.0
         with:
