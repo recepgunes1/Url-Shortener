@@ -108,7 +108,6 @@ jobs:
           config: .github/cr-config.yaml
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-          CR_RELEASE_NAME_TEMPLATE: "{{ .Version }}"
       - name: Release summary
         run: |
           echo "### Helm Chart Released Successfully! :package:" >> $GITHUB_STEP_SUMMARY
