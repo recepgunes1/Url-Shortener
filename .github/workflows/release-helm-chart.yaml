@@ -1,0 +1,120 @@
+name: Release Helm Chart
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: recepgunes1/url-shortener/backend
+
+jobs:
+  release:
+    name: Release Helm Chart
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          # Get tag name (e.g., v1.0.0)
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          # Remove 'v' prefix to get version (e.g., 1.0.0)
+          VERSION=${TAG_NAME#v}
+          
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Chart version will be: ${VERSION}"
+
+      - name: Get latest image for environment
+        id: image
+        run: |
+          # You can customize this logic to determine which environment image to use
+          # For example, you could parse the tag or use workflow inputs
+          
+          # Default to production for releases
+          ENVIRONMENT="production"
+          
+          # Alternative: extract environment from tag (e.g., v1.0.0-staging)
+          if [[ "${{ steps.version.outputs.tag_name }}" == *"-staging"* ]]; then
+            ENVIRONMENT="staging"
+          elif [[ "${{ steps.version.outputs.tag_name }}" == *"-production"* ]]; then
+            ENVIRONMENT="production"
+          fi
+          
+          IMAGE_TAG="${ENVIRONMENT}-latest"
+          
+          echo "environment=${ENVIRONMENT}" >> $GITHUB_OUTPUT
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "Using image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+
+      - name: Verify image exists
+        run: |
+          # Optional: verify the image exists in the registry
+          echo "Verifying image exists..."
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image.outputs.image_tag }} || {
+            echo "Error: Image not found in registry"
+            echo "Please build and push the image first using the build-image workflow"
+            exit 1
+          }
+
+      - name: Update Chart version and values
+        run: |
+          CHART_VERSION="${{ steps.version.outputs.version }}"
+          IMAGE_TAG="${{ steps.image.outputs.image_tag }}"
+          
+          echo "Updating Chart.yaml version to ${CHART_VERSION}"
+          echo "Updating values.yaml image tag to ${IMAGE_TAG}"
+          
+          # Update Chart.yaml version
+          sed -i "s/^version:.*/version: ${CHART_VERSION}/" charts/url-shortener/Chart.yaml
+          
+          # Update values.yaml with image repository and tag
+          sed -i "s|repository:.*|repository: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}|" charts/url-shortener/values.yaml
+          sed -i 's/tag: ".*"/tag: "'"${IMAGE_TAG}"'"/' charts/url-shortener/values.yaml
+          
+          # Show the changes
+          echo "=== Chart.yaml ===" 
+          cat charts/url-shortener/Chart.yaml
+          echo ""
+          echo "=== values.yaml (image section) ==="
+          grep -A 3 "^image:" charts/url-shortener/values.yaml
+
+      - name: Commit changes
+        run: |
+          git add charts/url-shortener/Chart.yaml charts/url-shortener/values.yaml
+          git commit -m "Release chart version ${{ steps.version.outputs.version }}" || {
+            echo "No changes to commit"
+          }
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.6.0
+        with:
+          charts_dir: charts
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Release summary
+        run: |
+          echo "### Helm Chart Released Successfully! :package:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Chart Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** ${{ steps.version.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ steps.image.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** ${{ steps.image.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Full Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY

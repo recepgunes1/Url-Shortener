@@ -44,38 +44,13 @@ jobs:
             type=raw,value=${{ inputs.environment }}-latest
             type=raw,value=${{ inputs.environment }}-${{ steps.commit.outputs.short_sha }}
 
-  setup:
-    name: Setup Docker Environment
+  build-and-push:
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
+    needs: [prepare]
     permissions:
       contents: read
       packages: write
-
-    outputs:
-      registry_token: ${{ steps.login.outputs.docker_username }}
-
-    steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        id: login
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-  build:
-    name: Build Docker Image
-    runs-on: ubuntu-latest
-    needs: [prepare, setup]
-    permissions:
-      contents: read
-      packages: write
-
-    outputs:
-      image_artifact: ${{ steps.build.outputs.imageid }}
 
     steps:
       - name: Checkout code
@@ -84,93 +59,31 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
-        id: build
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./src/UrlShortener.API/Dockerfile
-          push: false
+          push: true
           tags: ${{ needs.prepare.outputs.image_tags }}
           labels: ${{ needs.prepare.outputs.image_labels }}
-          outputs: type=docker,dest=/tmp/image.tar
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.environment }}-latest
+          cache-to: type=inline
 
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp/image.tar
-          retention-days: 0
-
-  push:
-    name: Push Docker Image to Registry
-    runs-on: ubuntu-latest
-    needs: [prepare, build]
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp
-
-      - name: Load and push Docker image
+      - name: Image build summary
         run: |
-          docker load --input /tmp/image.tar
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.environment }}-${{ needs.prepare.outputs.short_sha }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.environment }}-latest
-
-  release:
-    name: Create helm chart release
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    needs: [prepare, build, push]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
-      - name: Update Chart version and values
-        run: |
-          CHART_VERSION="${{ inputs.environment }}-${{ needs.prepare.outputs.short_sha }}"
-          
-          # Update Chart.yaml version
-          sed -i "s/^version:.*/version: ${CHART_VERSION}/" charts/url-shortener/Chart.yaml
-          
-          # Update values.yaml with image repository and tag
-          sed -i "s|repository:.*|repository: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}|" charts/url-shortener/values.yaml
-          sed -i 's/tag: ".*"/tag: "'"${CHART_VERSION}"'"/' charts/url-shortener/values.yaml
-          
-          # Commit changes
-          git add charts/url-shortener/Chart.yaml charts/url-shortener/values.yaml
-          git commit -m "Update chart version to ${CHART_VERSION}" || echo "No changes to commit"
-
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.6.0
-        with:
-          charts_dir: charts
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          echo "### Docker Image Built Successfully! :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ needs.prepare.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.environment }}-latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.environment }}-${{ needs.prepare.outputs.short_sha }}\`" >> $GITHUB_STEP_SUMMARY
