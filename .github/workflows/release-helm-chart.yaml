@@ -40,25 +40,10 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Chart version will be: ${VERSION}"
 
-      - name: Get latest image for environment
+      - name: Get latest image
         id: image
         run: |
-          # You can customize this logic to determine which environment image to use
-          # For example, you could parse the tag or use workflow inputs
-          
-          # Default to production for releases
-          ENVIRONMENT="production"
-          
-          # Alternative: extract environment from tag (e.g., v1.0.0-staging)
-          if [[ "${{ steps.version.outputs.tag_name }}" == *"-staging"* ]]; then
-            ENVIRONMENT="staging"
-          elif [[ "${{ steps.version.outputs.tag_name }}" == *"-production"* ]]; then
-            ENVIRONMENT="production"
-          fi
-          
-          IMAGE_TAG="${ENVIRONMENT}-latest"
-          
-          echo "environment=${ENVIRONMENT}" >> $GITHUB_OUTPUT
+          IMAGE_TAG="latest"
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
           echo "Using image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
 
@@ -108,13 +93,13 @@ jobs:
           config: .github/cr-config.yaml
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
       - name: Release summary
         run: |
           echo "### Helm Chart Released Successfully! :package:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Chart Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** ${{ steps.version.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ steps.image.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "**Image Tag:** ${{ steps.image.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Full Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
