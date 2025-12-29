@@ -51,23 +51,36 @@ jobs:
         run: |
           ENV="${{ inputs.environment }}"
           PACKAGE_NAME="url-shortener/backend"
+          # URL encode the package name (replace / with %2F)
+          ENCODED_PACKAGE_NAME=$(echo "$PACKAGE_NAME" | sed 's/\//%2F/g')
           
           echo "Fetching available images for environment: ${ENV}"
           
           # Get all package versions from GitHub Container Registry
           VERSIONS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/user/packages/container/${PACKAGE_NAME}/versions")
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/users/${{ github.repository_owner }}/packages/container/${ENCODED_PACKAGE_NAME}/versions")
+          
+          # Debug: Check if we got valid JSON
+          echo "API Response:"
+          echo "$VERSIONS" | jq '.' || {
+            echo "Error: Invalid JSON response from API"
+            echo "Raw response: $VERSIONS"
+            exit 1
+          }
           
           # Extract tags that match the environment pattern and get the most recent one
           IMAGE_TAG=$(echo "$VERSIONS" | jq -r \
             --arg env "${ENV}" \
-            '[.[] | select(.metadata.container.tags[] | startswith($env + "-")) | 
+            '[.[] | select(.metadata.container.tags[]? | startswith($env + "-")) | 
             {tag: .metadata.container.tags[], created: .created_at}] | 
-            sort_by(.created) | reverse | .[0].tag' 2>/dev/null)
+            sort_by(.created) | reverse | .[0].tag // empty')
           
-          if [ -z "$IMAGE_TAG" ] || [ "$IMAGE_TAG" = "null" ]; then
+          if [ -z "$IMAGE_TAG" ]; then
             echo "Error: No image found for environment '${ENV}'"
+            echo "Available tags:"
+            echo "$VERSIONS" | jq -r '.[].metadata.container.tags[]?' | head -20
             echo "Please build and push an image for this environment first"
             exit 1
           fi
