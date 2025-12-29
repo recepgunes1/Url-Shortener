@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/recepgunes1/url-shortener/backend
   pullPolicy: IfNotPresent
-  tag: ""
+  tag: "staging-9e7538a"
 
 service:
   type: ClusterIP
