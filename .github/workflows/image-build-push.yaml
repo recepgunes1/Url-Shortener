@@ -137,9 +137,11 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.environment }}-latest
 
   release:
+    name: Create helm chart release
     permissions:
       contents: write
     runs-on: ubuntu-latest
+    needs: [prepare, build, push]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
