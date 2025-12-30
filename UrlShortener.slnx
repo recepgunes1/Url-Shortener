@@ -1,4 +1,9 @@
 <Solution>
+  <Folder Name="/scipts/">
+    <File Path="scripts\deploy-stack.sh" />
+    <File Path="scripts\test-postgresql-connection.sh" />
+    <File Path="scripts\test-redis-connection.sh" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/UrlShortener.API/UrlShortener.API.csproj" />
     <Project Path="src/UrlShortener.Application/UrlShortener.Application.csproj" />
