@@ -141,7 +141,7 @@ deploy_application() {
 
 print_connection_info() {
     local env="$1"
-    local node_ip=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+    local node_ip=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)    
     
     echo ""
     echo "Deployment complete ($env)"
@@ -151,14 +151,14 @@ print_connection_info() {
 }
 
 test_stack() {
-  local env="$1"
-  local node_ip=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+    local env="$1"
+    local node_ip=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)    
 
-  echo ""
-  echo "Testing stack ($env)..."
-  
-  bash "$(dirname "$0")/test-postgresql-connection.sh" "$node_ip" "$PG_NODE_PORT" "$PG_USER" "$PG_PASSWORD" "$PG_DATABASE"
-  bash "$(dirname "$0")/test-redis-connection.sh" "$node_ip" "$REDIS_NODE_PORT" "$REDIS_USER" "$REDIS_PASSWORD"
+    echo ""
+    echo "Testing stack ($env)..."
+
+    bash "$(dirname "$0")/test-postgresql-connection.sh" postgresql://$PG_USER:$PG_PASSWORD@$node_ip:$PG_NODE_PORT/$PG_DATABASE
+    bash "$(dirname "$0")/test-redis-connection.sh" "$node_ip" "$REDIS_NODE_PORT" "$REDIS_USER" "$REDIS_PASSWORD"
 }
 
 teardown_application() {

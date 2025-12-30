@@ -1,5 +1,5 @@
 <Solution>
-  <Folder Name="/scipts/">
+  <Folder Name="/scripts/">
     <File Path="scripts\deploy-stack.sh" />
     <File Path="scripts\test-postgresql-connection.sh" />
     <File Path="scripts\test-redis-connection.sh" />

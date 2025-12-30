@@ -13,7 +13,7 @@ fi
 
 sudo apt clean && sudo apt update -y && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt autoclean -y && sudo apt autoremove -y
 
-sudo apt install -y curl git
+sudo apt install -y curl git redis-tools postgresql-client
 
 curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644
 
