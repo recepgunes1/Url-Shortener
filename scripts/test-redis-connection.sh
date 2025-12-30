@@ -7,6 +7,8 @@ REDIS_PORT="${2:-30380}"
 REDIS_USER="${3:-default}"
 REDIS_PASSWORD="${4:-password}"
 
+echo "Testing Redis..."
+
 redis-cli \
     -h "$NODE_IP" \
     -p "$REDIS_PORT" \

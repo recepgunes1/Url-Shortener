@@ -8,6 +8,8 @@ PG_USER="${3:-postgres}"
 PG_PASSWORD="${4:-password}"
 PG_DATABASE="${5:-postgres}"
 
+echo "Testing PostgreSQL..."
+
 PGPASSWORD="$PG_PASSWORD" psql \
     -h "$NODE_IP" \
     -p "$PG_PORT" \

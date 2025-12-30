@@ -3,6 +3,7 @@
     <File Path="scripts\deploy-stack.sh" />
     <File Path="scripts\test-postgresql-connection.sh" />
     <File Path="scripts\test-redis-connection.sh" />
+    <File Path="scripts\install-dependencies.sh" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/UrlShortener.API/UrlShortener.API.csproj" />

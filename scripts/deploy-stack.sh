@@ -145,14 +145,18 @@ print_connection_info() {
     
     echo ""
     echo "Deployment complete ($env)"
-    echo ""
     echo "PostgreSQL:  psql \"postgresql://$PG_USER:$PG_PASSWORD@$node_ip:$PG_NODE_PORT/$PG_DATABASE\""
     echo "Redis:       redis-cli -h $node_ip -p $REDIS_NODE_PORT --user $REDIS_USER --pass $REDIS_PASSWORD"
     echo "API:         http://$node_ip:$API_NODE_PORT"
-    echo ""
 }
 
 test_stack() {
+  local env="$1"
+  local node_ip=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+
+  echo ""
+  echo "Testing stack ($env)..."
+  
   bash "$(dirname "$0")/test-postgresql-connection.sh" "$node_ip" "$PG_NODE_PORT" "$PG_USER" "$PG_PASSWORD" "$PG_DATABASE"
   bash "$(dirname "$0")/test-redis-connection.sh" "$node_ip" "$REDIS_NODE_PORT" "$REDIS_USER" "$REDIS_PASSWORD"
 }
@@ -197,6 +201,7 @@ do_up() {
     create_app_secrets
     deploy_application
     print_connection_info "$env"
+    test_stack "$env"
 }
 
 do_down() {
