@@ -1,0 +1,32 @@
+flowchart LR
+ subgraph K8s["k3s Cluster"]
+   subgraph AppNS["url-shortener Namespace"]
+        A[Deployment]
+        B[Service]
+        C[Ingress]
+        D[Secret]
+    end
+   subgraph PGNS["postgresql Namespace"]
+        E[StatefulSet]
+        F[Service]
+        G[(PVC)]
+        H[Backup CronJob]
+    end
+   subgraph RedisNS["redis Namespace"]
+        I[StatefulSet]
+        J[Service]
+        K[(PVC)]
+    end
+  end
+    U[User] --> C
+    C --> B
+    B --> A
+    A --> D
+    A --> F
+    A --> J
+    F --> E
+    E --> G
+    H --> E
+    J --> I
+    I --> K
+  

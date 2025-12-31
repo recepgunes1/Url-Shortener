@@ -1,0 +1,24 @@
+flowchart LR
+ subgraph ImageBuild["Build and Push Image"]
+        B["Checkout"]
+        A["Manual Trigger"]
+        C["Setup Buildx"]
+        D["Login GHCR"]
+        E["Build and Push"]
+  end
+ subgraph HelmRelease["Release Helm Chart"]
+        G["Get Image Tag"]
+        F["Manual Trigger"]
+        H["Update Chart"]
+        I["Commit and Push"]
+        J["Chart Releaser"]
+  end
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    F --> G
+    G --> H
+    H --> I
+    I --> J
+    E -.-> G

@@ -1,0 +1,34 @@
+flowchart LR
+   subgraph Dev["Development"]
+          A[Developer]
+          B[Git Commit]
+          C[Pre-Commit Hooks]
+    end
+   subgraph CI["CI/CD"]
+          D[Build Image]
+          E[Push to GHCR]
+          F[Release Helm Chart]
+    end
+   subgraph K8s["k3s Cluster"]
+          G[Helm Deploy]
+          H[URL Shortener API]
+          I[(PostgreSQL)]
+          J[(Redis)]
+    end
+   subgraph Access["External Access"]
+          K[NodePort Services]
+          L[User]
+    end
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F -.-> G
+    G --> H
+    H --> I
+    H --> J
+    I --> K
+    H --> K
+    J --> K
+    K --> L
