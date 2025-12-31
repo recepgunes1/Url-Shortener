@@ -3,6 +3,7 @@
 A URL shortening service deployed on a local k3s Kubernetes cluster with PostgreSQL and Redis.
 
 ## Architecture
+If the diagrams are hard to read, refer to [MERMAIDS.md](/MERMAIDS.md) for zooming and other interactive features.
 
 ### Overview
 ![Overview](/diagrams/overview.svg)
