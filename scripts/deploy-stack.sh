@@ -61,10 +61,16 @@ deploy_postgresql() {
         --set auth.database="$PG_DATABASE" \
         --set primary.service.type=NodePort \
         --set-string primary.service.nodePorts.postgresql="$PG_NODE_PORT" \
-        --wait &>/dev/null
+        --set backup.enabled=true \
+        --set backup.cronjob.schedule="*/5 * * * *" \
+        --set backup.cronjob.timeZone="UTC" \
+        --set backup.cronjob.concurrencyPolicy="Forbid" \
+        --set backup.cronjob.storage.enabled=true \
+        --set backup.cronjob.storage.size="5Gi" \
+        --set backup.cronjob.storage.storageClass="" \
+        &>/dev/null
     
-    kubectl wait --for=condition=ready pod \
-        -l app.kubernetes.io/name=postgresql \
+    kubectl rollout status statefulset/"${PG_RELEASE_NAME}" \
         -n "$PG_NAMESPACE" \
         --timeout=180s &>/dev/null
     
@@ -142,12 +148,16 @@ deploy_application() {
 print_connection_info() {
     local env="$1"
     local node_ip=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)    
+    local api_url="http://$node_ip:$API_NODE_PORT"
+    if [ "$env" == "staging" ]; then
+        api_url="${api_url}/scalar"
+    fi
     
     echo ""
     echo "Deployment complete ($env)"
     echo "PostgreSQL:  psql \"postgresql://$PG_USER:$PG_PASSWORD@$node_ip:$PG_NODE_PORT/$PG_DATABASE\""
     echo "Redis:       redis-cli -h $node_ip -p $REDIS_NODE_PORT --user $REDIS_USER --pass $REDIS_PASSWORD"
-    echo "API:         http://$node_ip:$API_NODE_PORT"
+    echo "API:         $api_url"
 }
 
 test_stack() {
