@@ -41,7 +41,7 @@ If the diagrams are hard to read, refer to [MERMAIDS.md](/MERMAIDS.md) for zoomi
 ## Quick Start
 
 ### 1. Install Dependencies
-
+If the other scripts does not exist, following script will download them.
 ```bash
 ./scripts/install-dependencies.sh
 ```

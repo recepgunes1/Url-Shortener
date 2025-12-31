@@ -26,3 +26,24 @@ sudo chown $USER:$USER ~/.kube/config
 chmod 600 ~/.kube/config
 
 curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | bash
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_BASE_URL="https://raw.githubusercontent.com/recepgunes1/Url-Shortener/main/scripts"
+
+download_if_missing() {
+    local filename="$1"
+    local filepath="${SCRIPT_DIR}/${filename}"
+    
+    if [ ! -f "$filepath" ]; then
+        echo "Downloading ${filename}..."
+        curl -fsSL "${REPO_BASE_URL}/${filename}" -o "$filepath"
+        chmod +x "$filepath"
+        echo "${filename} downloaded successfully"
+    else
+        echo "${filename} already exists, skipping download"
+    fi
+}
+
+download_if_missing "deploy-stack.sh"
+download_if_missing "test-postgresql-connection.sh"
+download_if_missing "test-redis-connection.sh"
