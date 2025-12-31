@@ -62,7 +62,7 @@ deploy_postgresql() {
         --set primary.service.type=NodePort \
         --set-string primary.service.nodePorts.postgresql="$PG_NODE_PORT" \
         --set backup.enabled=true \
-        --set backup.cronjob.schedule="*/5 * * * *" \
+        --set backup.cronjob.schedule="0 2 * * *" \
         --set backup.cronjob.timeZone="UTC" \
         --set backup.cronjob.concurrencyPolicy="Forbid" \
         --set backup.cronjob.storage.enabled=true \
