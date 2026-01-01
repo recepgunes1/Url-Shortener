@@ -69,15 +69,19 @@ deploy_aspire() {
     # Deploy Aspire Dashboard with Helm
     helm upgrade --install "$ASPIRE_RELEASE_NAME" aspire-dashboard/aspire-dashboard \
         --namespace "$ASPIRE_NAMESPACE" \
-        --set env.DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true \
-        --set service.type=NodePort \
-        --set service.ports.ui.nodePort="$ASPIRE_UI_NODE_PORT" \
-        --set service.ports.otlp.nodePort="$ASPIRE_OTLP_NODE_PORT" \
-        --wait &>/dev/null
+        --set ui.auth.authMode=Unsecured \
+        --set otlp.auth.authMode=Unsecured \
+        --wait
     
-    # Set internal service connection details for other components
+    # Patch the service to NodePort since the chart doesn't support it natively
+    kubectl patch svc "${ASPIRE_RELEASE_NAME}" -n "$ASPIRE_NAMESPACE" --type='json' -p='[
+      {"op": "replace", "path": "/spec/type", "value": "NodePort"},
+      {"op": "add", "path": "/spec/ports/0/nodePort", "value": '$ASPIRE_UI_NODE_PORT'},
+      {"op": "add", "path": "/spec/ports/1/nodePort", "value": '$ASPIRE_OTLP_NODE_PORT'}
+    ]'
+    
     ASPIRE_OTLP_HOST="${ASPIRE_RELEASE_NAME}.${ASPIRE_NAMESPACE}.svc.cluster.local"
-    ASPIRE_OTLP_ENDPOINT="http://${ASPIRE_OTLP_HOST}:4317"
+    ASPIRE_OTLP_ENDPOINT="http://${ASPIRE_OTLP_HOST}:18889"
 }
 
 # Deploys PostgreSQL using the Bitnami Helm chart
