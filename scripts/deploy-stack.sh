@@ -77,19 +77,32 @@ deploy_jaeger() {
         --set query.enabled=false \
         --wait &>/dev/null
     
-    # Patch the service to NodePort since the chart defaults to ClusterIP
-    kubectl patch svc "${JAEGER_RELEASE_NAME}-query" -n "$JAEGER_NAMESPACE" --type='json' -p='[
-      {"op": "replace", "path": "/spec/type", "value": "NodePort"},
-      {"op": "add", "path": "/spec/ports/0/nodePort", "value": '$JAEGER_UI_NODE_PORT'}
-    ]' &>/dev/null
+    # Get the actual service name created by the chart
+    local svc_name
+    svc_name=$(kubectl get svc -n "$JAEGER_NAMESPACE" -l "app.kubernetes.io/instance=${JAEGER_RELEASE_NAME}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
     
-    kubectl patch svc "${JAEGER_RELEASE_NAME}-collector" -n "$JAEGER_NAMESPACE" --type='json' -p='[
-      {"op": "replace", "path": "/spec/type", "value": "NodePort"},
-      {"op": "add", "path": "/spec/ports/0/nodePort", "value": '$JAEGER_OTLP_NODE_PORT'}
+    if [ -z "$svc_name" ]; then
+        echo "Error: Could not find Jaeger service"
+        exit 1
+    fi
+    
+    # Find port indices for UI (16686) and OTLP gRPC (4317)
+    local ui_port_index otlp_port_index
+    ui_port_index=$(kubectl get svc "$svc_name" -n "$JAEGER_NAMESPACE" -o json | \
+        jq '.spec.ports | to_entries[] | select(.value.port == 16686) | .key')
+    otlp_port_index=$(kubectl get svc "$svc_name" -n "$JAEGER_NAMESPACE" -o json | \
+        jq '.spec.ports | to_entries[] | select(.value.port == 4317) | .key')
+    
+    # Patch service: change type to NodePort AND set specific nodePort values in one operation
+    # Must change type first, then nodePort values can be assigned
+    kubectl patch svc "$svc_name" -n "$JAEGER_NAMESPACE" --type='json' -p='[
+        {"op": "replace", "path": "/spec/type", "value": "NodePort"},
+        {"op": "add", "path": "/spec/ports/'"$ui_port_index"'/nodePort", "value": '"$JAEGER_UI_NODE_PORT"'},
+        {"op": "add", "path": "/spec/ports/'"$otlp_port_index"'/nodePort", "value": '"$JAEGER_OTLP_NODE_PORT"'}
     ]' &>/dev/null
     
     # Set internal service connection details for other components
-    JAEGER_OTLP_ENDPOINT="http://${JAEGER_RELEASE_NAME}-collector.${JAEGER_NAMESPACE}.svc.cluster.local:4317"
+    JAEGER_OTLP_ENDPOINT="http://${svc_name}.${JAEGER_NAMESPACE}.svc.cluster.local:4317"
 }
 
 # Deploys PostgreSQL using the Bitnami Helm chart
@@ -156,6 +169,10 @@ deploy_redis() {
     REDIS_PASSWORD=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24)
     REDIS_ADMIN_PASSWORD=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32)
     
+    # Add Bitnami Helm repository (ignore errors if already added)
+    helm repo add bitnami https://charts.bitnami.com/bitnami &>/dev/null || true
+    helm repo update &>/dev/null
+
     # Create namespace idempotently
     kubectl create namespace "$REDIS_NAMESPACE" --dry-run=client -o yaml 2>/dev/null | kubectl apply -f - &>/dev/null
     
