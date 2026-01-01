@@ -19,6 +19,7 @@ flowchart LR
           H[URL Shortener API]
           I[(PostgreSQL)]
           J[(Redis)]
+          M[Jaeger]
     end
    subgraph Access["External Access"]
           K[NodePort Services]
@@ -33,9 +34,11 @@ flowchart LR
     G --> H
     H --> I
     H --> J
+    H -->|OTLP| M
     I --> K
     H --> K
     J --> K
+    M --> K
     K --> L
 ```
 
@@ -71,7 +74,7 @@ flowchart LR
     A --> D
     A --> F
     A --> J
-    A -.->|OTLP| M
+    A -->|OTLP| M
     F --> E
     E --> G
     H --> E
