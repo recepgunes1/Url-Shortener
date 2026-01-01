@@ -39,6 +39,6 @@ public sealed class GetUrlRequestHandler(
             TimeSpan.FromDays(configuration.GetOrThrowException<int>("Url:CacheExpiresInDays"))
         );
 
-        return entity.ShortCode;
+        return entity.Url;
     }
 }
