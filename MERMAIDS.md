@@ -60,6 +60,10 @@ flowchart LR
         J[Service]
         K[(PVC)]
     end
+   subgraph JaegerNS["jaeger Namespace"]
+        L[Deployment]
+        M[Service]
+    end
   end
     U[User] --> C
     C --> B
@@ -67,11 +71,13 @@ flowchart LR
     A --> D
     A --> F
     A --> J
+    A -.->|OTLP| M
     F --> E
     E --> G
     H --> E
     J --> I
     I --> K
+    M --> L
 ```
 
 ### CI/CD Workflow
