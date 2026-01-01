@@ -70,11 +70,12 @@ In staging, the API documentation is available at `/scalar` for testing endpoint
 
 After deployment, services are accessible via NodePort:
 
-| Service    | Staging Port | Production Port |
-|------------|--------------|-----------------|
-| API        | 30080        | 30081           |
-| PostgreSQL | 30432        | 30433           |
-| Redis      | 30380        | 30381           |
+| Service          | Staging Port | Production Port |
+|------------------|--------------|-----------------|
+| API              | 30080        | 30081           |
+| PostgreSQL       | 30432        | 30433           |
+| Redis            | 30380        | 30381           |
+| Aspire Dashboard | 30888        | 30889           |
 
 ## Testing Connectivity
 

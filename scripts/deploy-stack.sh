@@ -33,18 +33,52 @@ setup_config() {
     REDIS_RELEASE_NAME="url-shortener-redis-${env}"
     REDIS_NAMESPACE="url-shortener-redis-${env}"
     
+    # Aspire Dashboard configuration
+    ASPIRE_RELEASE_NAME="url-shortener-aspire-${env}"
+    ASPIRE_NAMESPACE="url-shortener-aspire-${env}"
+    
     # Environment-specific port assignments
     if [ "$env" == "staging" ]; then
-        PG_NODE_PORT="30432"      # PostgreSQL external port for staging
-        REDIS_NODE_PORT="30380"   # Redis external port for staging
-        API_NODE_PORT="30080"     # API external port for staging
+        PG_NODE_PORT="30432"            # PostgreSQL external port for staging
+        REDIS_NODE_PORT="30380"         # Redis external port for staging
+        API_NODE_PORT="30080"           # API external port for staging
+        ASPIRE_UI_NODE_PORT="30888"     # Dashboard UI for staging
+        ASPIRE_OTLP_NODE_PORT="30417"   # OTLP gRPC endpoint for staging
         ASPNETCORE_ENV="Staging"
     else
-        PG_NODE_PORT="30433"      # PostgreSQL external port for production
-        REDIS_NODE_PORT="30381"   # Redis external port for production
-        API_NODE_PORT="30081"     # API external port for production
+        PG_NODE_PORT="30433"            # PostgreSQL external port for production
+        REDIS_NODE_PORT="30381"         # Redis external port for production
+        API_NODE_PORT="30081"           # API external port for production
+        ASPIRE_UI_NODE_PORT="30889"     # Dashboard UI for production
+        ASPIRE_OTLP_NODE_PORT="30418"   # OTLP gRPC endpoint for production
         ASPNETCORE_ENV="Production"
     fi
+}
+
+# Deploys Aspire Dashboard using the community Helm chart
+deploy_aspire() {
+    echo "Deploying Aspire Dashboard..."
+    
+    # Add Aspire Dashboard Helm repository
+    helm repo add aspire-dashboard https://kube-the-home.github.io/aspire-dashboard-helm &>/dev/null || true
+    helm repo update &>/dev/null
+    
+    # Create namespace idempotently
+    kubectl create namespace "$ASPIRE_NAMESPACE" --dry-run=client -o yaml 2>/dev/null | kubectl apply -f - &>/dev/null
+    
+    # Deploy Aspire Dashboard with Helm
+    helm upgrade --install "$ASPIRE_RELEASE_NAME" aspire-dashboard/aspire-dashboard \
+        --namespace "$ASPIRE_NAMESPACE" \
+        --set env[0].name=DASHBOARD__FRONTEND__AUTHMODE \
+        --set env[0].value=Unsecured \
+        --set service.type=NodePort \
+        --set service.ports.ui.nodePort="$ASPIRE_UI_NODE_PORT" \
+        --set service.ports.otlp.nodePort="$ASPIRE_OTLP_NODE_PORT" \
+        --wait &>/dev/null
+    
+    # Set internal service connection details for other components
+    ASPIRE_OTLP_HOST="${ASPIRE_RELEASE_NAME}.${ASPIRE_NAMESPACE}.svc.cluster.local"
+    ASPIRE_OTLP_ENDPOINT="http://${ASPIRE_OTLP_HOST}:4317"
 }
 
 # Deploys PostgreSQL using the Bitnami Helm chart
@@ -165,7 +199,9 @@ create_app_secrets() {
         --from-literal=ConnectionStrings__Database="$PG_CONNECTION_STRING" \
         --from-literal=ConnectionStrings__Redis="$REDIS_CONNECTION_STRING" \
         --from-literal=Url__CacheExpiresInDays="1" \
-        --from-literal=Url__CodeLength="6" &>/dev/null
+        --from-literal=Url__CodeLength="6" \
+        --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="$ASPIRE_OTLP_ENDPOINT" \
+        --from-literal=OTEL_EXPORTER_OTLP_PROTOCOL="grpc" &>/dev/null
 }
 
 # Deploys the URL Shortener application using its Helm chart
@@ -194,6 +230,7 @@ print_connection_info() {
     # Get the first node's internal IP address
     local node_ip=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)    
     local api_url="http://$node_ip:$API_NODE_PORT"
+    local aspire_url="http://$node_ip:$ASPIRE_UI_NODE_PORT"
     
     # Staging environment includes Scalar API docs endpoint
     if [ "$env" == "staging" ]; then
@@ -203,6 +240,7 @@ print_connection_info() {
     echo ""
     echo "Deployment complete ($env)"
     echo "API: $api_url"
+    echo "Aspire Dashboard: $aspire_url"
 }
 
 # Runs connectivity tests for PostgreSQL and Redis
@@ -235,6 +273,16 @@ teardown_secrets() {
     kubectl delete secret url-shortener-secrets -n "$APP_NAMESPACE" --ignore-not-found &>/dev/null
     kubectl get namespace "$APP_NAMESPACE" &>/dev/null && \
         kubectl delete namespace "$APP_NAMESPACE" --wait=true --timeout=60s &>/dev/null || true
+}
+
+# Removes Aspire Dashboard deployment
+teardown_aspire() {
+    echo "Removing Aspire Dashboard..."
+    helm status "$ASPIRE_RELEASE_NAME" -n "$ASPIRE_NAMESPACE" &>/dev/null && \
+        helm uninstall "$ASPIRE_RELEASE_NAME" -n "$ASPIRE_NAMESPACE" &>/dev/null || true
+    
+    kubectl get namespace "$ASPIRE_NAMESPACE" &>/dev/null && \
+        kubectl delete namespace "$ASPIRE_NAMESPACE" --wait=true --timeout=60s &>/dev/null || true
 }
 
 # Removes Redis deployment, cleans up Persistent Volume Claims to free storage
@@ -271,6 +319,7 @@ do_up() {
     echo "Deploying URL Shortener ($env)..."
     
     setup_config "$env"
+    deploy_aspire
     deploy_postgresql
     deploy_redis
     create_app_secrets
@@ -289,6 +338,7 @@ do_down() {
     teardown_secrets
     teardown_redis
     teardown_postgresql
+    teardown_aspire
     
     echo "Teardown complete"
 }
