@@ -33,55 +33,63 @@ setup_config() {
     REDIS_RELEASE_NAME="url-shortener-redis-${env}"
     REDIS_NAMESPACE="url-shortener-redis-${env}"
     
-    # Aspire Dashboard configuration
-    ASPIRE_RELEASE_NAME="url-shortener-aspire-${env}"
-    ASPIRE_NAMESPACE="url-shortener-aspire-${env}"
+    # Jaeger configuration
+    JAEGER_RELEASE_NAME="url-shortener-jaeger-${env}"
+    JAEGER_NAMESPACE="url-shortener-jaeger-${env}"
     
     # Environment-specific port assignments
     if [ "$env" == "staging" ]; then
         PG_NODE_PORT="30432"            # PostgreSQL external port for staging
         REDIS_NODE_PORT="30380"         # Redis external port for staging
         API_NODE_PORT="30080"           # API external port for staging
-        ASPIRE_UI_NODE_PORT="30888"     # Dashboard UI for staging
-        ASPIRE_OTLP_NODE_PORT="30417"   # OTLP gRPC endpoint for staging
+        JAEGER_UI_NODE_PORT="30686"     # Jaeger UI for staging
+        JAEGER_OTLP_NODE_PORT="30417"   # OTLP gRPC endpoint for staging
         ASPNETCORE_ENV="Staging"
     else
         PG_NODE_PORT="30433"            # PostgreSQL external port for production
         REDIS_NODE_PORT="30381"         # Redis external port for production
         API_NODE_PORT="30081"           # API external port for production
-        ASPIRE_UI_NODE_PORT="30889"     # Dashboard UI for production
-        ASPIRE_OTLP_NODE_PORT="30418"   # OTLP gRPC endpoint for production
+        JAEGER_UI_NODE_PORT="30687"     # Jaeger UI for production
+        JAEGER_OTLP_NODE_PORT="30418"   # OTLP gRPC endpoint for production
         ASPNETCORE_ENV="Production"
     fi
 }
 
-# Deploys Aspire Dashboard using the community Helm chart
-deploy_aspire() {
-    echo "Deploying Aspire Dashboard..."
+# Deploys Jaeger using the official Helm chart
+deploy_jaeger() {
+    echo "Deploying Jaeger..."
     
-    # Add Aspire Dashboard Helm repository
-    helm repo add aspire-dashboard https://kube-the-home.github.io/aspire-dashboard-helm &>/dev/null || true
+    # Add Jaeger Helm repository
+    helm repo add jaegertracing https://jaegertracing.github.io/helm-charts &>/dev/null || true
     helm repo update &>/dev/null
     
     # Create namespace idempotently
-    kubectl create namespace "$ASPIRE_NAMESPACE" --dry-run=client -o yaml 2>/dev/null | kubectl apply -f - &>/dev/null
+    kubectl create namespace "$JAEGER_NAMESPACE" --dry-run=client -o yaml 2>/dev/null | kubectl apply -f - &>/dev/null
     
-    # Deploy Aspire Dashboard with Helm
-    helm upgrade --install "$ASPIRE_RELEASE_NAME" aspire-dashboard/aspire-dashboard \
-        --namespace "$ASPIRE_NAMESPACE" \
-        --set ui.auth.authMode=Unsecured \
-        --set otlp.auth.authMode=Unsecured \
-        --wait
+    # Deploy Jaeger all-in-one with in-memory storage
+    helm upgrade --install "$JAEGER_RELEASE_NAME" jaegertracing/jaeger \
+        --namespace "$JAEGER_NAMESPACE" \
+        --set provisionDataStore.cassandra=false \
+        --set allInOne.enabled=true \
+        --set storage.type=memory \
+        --set agent.enabled=false \
+        --set collector.enabled=false \
+        --set query.enabled=false \
+        --wait &>/dev/null
     
-    # Patch the service to NodePort since the chart doesn't support it natively
-    kubectl patch svc "${ASPIRE_RELEASE_NAME}" -n "$ASPIRE_NAMESPACE" --type='json' -p='[
+    # Patch the service to NodePort since the chart defaults to ClusterIP
+    kubectl patch svc "${JAEGER_RELEASE_NAME}-query" -n "$JAEGER_NAMESPACE" --type='json' -p='[
       {"op": "replace", "path": "/spec/type", "value": "NodePort"},
-      {"op": "add", "path": "/spec/ports/0/nodePort", "value": '$ASPIRE_UI_NODE_PORT'},
-      {"op": "add", "path": "/spec/ports/1/nodePort", "value": '$ASPIRE_OTLP_NODE_PORT'}
-    ]'
+      {"op": "add", "path": "/spec/ports/0/nodePort", "value": '$JAEGER_UI_NODE_PORT'}
+    ]' &>/dev/null
     
-    ASPIRE_OTLP_HOST="${ASPIRE_RELEASE_NAME}.${ASPIRE_NAMESPACE}.svc.cluster.local"
-    ASPIRE_OTLP_ENDPOINT="http://${ASPIRE_OTLP_HOST}:18889"
+    kubectl patch svc "${JAEGER_RELEASE_NAME}-collector" -n "$JAEGER_NAMESPACE" --type='json' -p='[
+      {"op": "replace", "path": "/spec/type", "value": "NodePort"},
+      {"op": "add", "path": "/spec/ports/0/nodePort", "value": '$JAEGER_OTLP_NODE_PORT'}
+    ]' &>/dev/null
+    
+    # Set internal service connection details for other components
+    JAEGER_OTLP_ENDPOINT="http://${JAEGER_RELEASE_NAME}-collector.${JAEGER_NAMESPACE}.svc.cluster.local:4317"
 }
 
 # Deploys PostgreSQL using the Bitnami Helm chart
@@ -203,7 +211,7 @@ create_app_secrets() {
         --from-literal=ConnectionStrings__Redis="$REDIS_CONNECTION_STRING" \
         --from-literal=Url__CacheExpiresInDays="1" \
         --from-literal=Url__CodeLength="6" \
-        --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="$ASPIRE_OTLP_ENDPOINT" \
+        --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="$JAEGER_OTLP_ENDPOINT" \
         --from-literal=OTEL_EXPORTER_OTLP_PROTOCOL="grpc" &>/dev/null
 }
 
@@ -233,7 +241,7 @@ print_connection_info() {
     # Get the first node's internal IP address
     local node_ip=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)    
     local api_url="http://$node_ip:$API_NODE_PORT"
-    local aspire_url="http://$node_ip:$ASPIRE_UI_NODE_PORT"
+    local jaeger_url="http://$node_ip:$JAEGER_UI_NODE_PORT"
     
     # Staging environment includes Scalar API docs endpoint
     if [ "$env" == "staging" ]; then
@@ -243,7 +251,7 @@ print_connection_info() {
     echo ""
     echo "Deployment complete ($env)"
     echo "API: $api_url"
-    echo "Aspire Dashboard: $aspire_url"
+    echo "Jaeger: $jaeger_url"
 }
 
 # Runs connectivity tests for PostgreSQL and Redis
@@ -278,16 +286,6 @@ teardown_secrets() {
         kubectl delete namespace "$APP_NAMESPACE" --wait=true --timeout=60s &>/dev/null || true
 }
 
-# Removes Aspire Dashboard deployment
-teardown_aspire() {
-    echo "Removing Aspire Dashboard..."
-    helm status "$ASPIRE_RELEASE_NAME" -n "$ASPIRE_NAMESPACE" &>/dev/null && \
-        helm uninstall "$ASPIRE_RELEASE_NAME" -n "$ASPIRE_NAMESPACE" &>/dev/null || true
-    
-    kubectl get namespace "$ASPIRE_NAMESPACE" &>/dev/null && \
-        kubectl delete namespace "$ASPIRE_NAMESPACE" --wait=true --timeout=60s &>/dev/null || true
-}
-
 # Removes Redis deployment, cleans up Persistent Volume Claims to free storage
 teardown_redis() {
     echo "Removing Redis..."
@@ -300,6 +298,17 @@ teardown_redis() {
     # Delete the namespace
     kubectl get namespace "$REDIS_NAMESPACE" &>/dev/null && \
         kubectl delete namespace "$REDIS_NAMESPACE" --wait=true --timeout=60s &>/dev/null || true
+}
+
+# Removes Jaeger deployment
+teardown_jaeger() {
+    echo "Removing Jaeger..."
+    helm status "$JAEGER_RELEASE_NAME" -n "$JAEGER_NAMESPACE" &>/dev/null && \
+        helm uninstall "$JAEGER_RELEASE_NAME" -n "$JAEGER_NAMESPACE" &>/dev/null || true
+    
+    # Delete the namespace
+    kubectl get namespace "$JAEGER_NAMESPACE" &>/dev/null && \
+        kubectl delete namespace "$JAEGER_NAMESPACE" --wait=true --timeout=60s &>/dev/null || true
 }
 
 # Removes PostgreSQL deployment, cleans up Persistent Volume Claims to free storage
@@ -322,7 +331,7 @@ do_up() {
     echo "Deploying URL Shortener ($env)..."
     
     setup_config "$env"
-    deploy_aspire
+    deploy_jaeger
     deploy_postgresql
     deploy_redis
     create_app_secrets
@@ -341,7 +350,7 @@ do_down() {
     teardown_secrets
     teardown_redis
     teardown_postgresql
-    teardown_aspire
+    teardown_jaeger
     
     echo "Teardown complete"
 }
