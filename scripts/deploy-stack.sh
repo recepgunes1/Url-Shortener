@@ -69,8 +69,7 @@ deploy_aspire() {
     # Deploy Aspire Dashboard with Helm
     helm upgrade --install "$ASPIRE_RELEASE_NAME" aspire-dashboard/aspire-dashboard \
         --namespace "$ASPIRE_NAMESPACE" \
-        --set env[0].name=DASHBOARD__FRONTEND__AUTHMODE \
-        --set env[0].value=Unsecured \
+        --set env.DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true \
         --set service.type=NodePort \
         --set service.ports.ui.nodePort="$ASPIRE_UI_NODE_PORT" \
         --set service.ports.otlp.nodePort="$ASPIRE_OTLP_NODE_PORT" \
