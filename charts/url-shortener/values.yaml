@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/recepgunes1/url-shortener/backend
-  tag: "staging-544899c"
+  tag: "staging-e130157"
   pullPolicy: IfNotPresent
 
 service:
