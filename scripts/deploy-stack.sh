@@ -155,6 +155,52 @@ deploy_postgresql() {
     PG_SERVICE_PORT="5432"
 }
 
+# Deploys a CronJob to clean up old PostgreSQL backups, keeping only the last 7
+deploy_pg_backup_retention() {
+    echo "Deploying PostgreSQL backup retention..."
+    
+    # The backup PVC is created when the first backup job runs
+    # Bitnami chart uses: <release>-pgdumpall
+    local backup_pvc="${PG_RELEASE_NAME}-pgdumpall"
+    
+    # Create the retention CronJob
+    cat <<EOF | kubectl apply -f - &>/dev/null
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ${PG_RELEASE_NAME}-backup-retention
+  namespace: ${PG_NAMESPACE}
+spec:
+  schedule: "0 3 * * *"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: cleanup
+            image: busybox:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              cd /backups
+              count=\$(ls -1 *.pgdump 2>/dev/null | wc -l)
+              if [ "\$count" -gt 7 ]; then
+                ls -1t *.pgdump | tail -n \$((count - 7)) | xargs rm -f
+              fi
+            volumeMounts:
+            - name: datadir
+              mountPath: /backups
+          volumes:
+          - name: datadir
+            persistentVolumeClaim:
+              claimName: ${backup_pvc}
+EOF
+}
+
 # Deploys Redis using the Bitnami Helm chart
 deploy_redis() {
     echo "Deploying Redis..."
@@ -350,6 +396,7 @@ do_up() {
     setup_config "$env"
     deploy_jaeger
     deploy_postgresql
+    deploy_pg_backup_retention
     deploy_redis
     create_app_secrets
     deploy_application

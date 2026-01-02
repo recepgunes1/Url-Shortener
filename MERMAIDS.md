@@ -45,42 +45,45 @@ flowchart LR
 ### Cluster
 ```mermaid
 flowchart LR
- subgraph K8s["k3s Cluster"]
-   subgraph AppNS["url-shortener Namespace"]
-        A[Deployment]
-        B[Service]
-        C[Ingress]
-        D[Secret]
+  subgraph K8s["k3s Cluster"]
+    subgraph AppNS["url-shortener Namespace"]
+      A[Deployment]
+      B[Service]
+      D[Secret]
     end
-   subgraph PGNS["postgresql Namespace"]
-        E[StatefulSet]
-        F[Service]
-        G[(PVC)]
-        H[Backup CronJob]
+    subgraph PGNS["postgresql Namespace"]
+      E[StatefulSet]
+      F[Service]
+      G[(Data PVC)]
+      G2[(Backup PVC)]
+      H[Backup CronJob]
+      H2[Retention CronJob]
     end
-   subgraph RedisNS["redis Namespace"]
-        I[StatefulSet]
-        J[Service]
-        K[(PVC)]
+    subgraph RedisNS["redis Namespace"]
+      I[StatefulSet]
+      J[Service]
+      K[(PVC)]
     end
-   subgraph JaegerNS["jaeger Namespace"]
-        L[Deployment]
-        M[Service]
+    subgraph JaegerNS["jaeger Namespace"]
+      L[Deployment]
+      M[Service]
     end
   end
-    U[User] --> C
-    C --> B
-    B --> A
-    A --> D
-    A --> F
-    A --> J
-    A -->|OTLP| M
-    F --> E
-    E --> G
-    H --> E
-    J --> I
-    I --> K
-    M --> L
+
+  U[User] --> B
+  B --> A
+  A -.->|envFrom| D
+  A --> F
+  A --> J
+  A -->|OTLP| M
+  F --> E
+  E --> G
+  H --> E
+  H -->|writes| G2
+  H2 -->|cleans| G2
+  J --> I
+  I --> K
+  M --> L
 ```
 
 ### CI/CD Workflow

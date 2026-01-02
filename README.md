@@ -6,16 +6,16 @@ A URL shortening service deployed on a local k3s Kubernetes cluster with Postgre
 If the diagrams are hard to read, refer to [MERMAIDS.md](/MERMAIDS.md) for zooming and other interactive features.
 
 ### Overview
-![Overview](/diagrams/overview.svg)
+![Overview](/diagrams/overview.png)
 
 ### Cluster
-![Cluster](/diagrams/cluster.svg)
+![Cluster](/diagrams/cluster.png)
 
 ### CI/CD Workflow
-![CI/CD](/diagrams/cicd.svg)
+![CI/CD](/diagrams/cicd.png)
 
 ### pre-commit Workflow
-![pre-commit](/diagrams/pre-commit.svg)
+![pre-commit](/diagrams/pre-commit.png)
 
 ## Project Structure
 
